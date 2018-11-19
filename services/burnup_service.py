@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 import pandas as pd
-import matplotlib.pyplot as plt
 import requests
 import re
 from datetime import datetime #, timedelta
 import numpy as np
 import holidays
 import os
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 import infra.trello_api.trello_api as api
 from resources.config import Config
@@ -60,18 +64,21 @@ def burnup_service(sprint_dt_start, trello_board):
         df['task'].str.extract('\[(\d*\.\d+|\d+)+\]$', expand=False)
     
     # Dump df to json
-    df.to_json('./df.json', orient='table')
+    df.to_json('./tmp/df.json', orient='table')
 
     df_points = _calc_points(df)
     # Dump df_points to json
-    df_points.reset_index(drop=True).to_json('./df_plot.json', orient='table')
+
+    df_points.reset_index(drop=True).to_json('./tmp/df_plot.json', orient='table')
 
     df_group = _aggregate_points(sprint_dt_start, df_points)
 
     df_group = _drop_non_working_days(df_group)
     df_group.index = df_group.index.strftime('%d-%m')
     # Dump df_group to json
-    df_group.to_json('./df_group.json', orient='table')
+    df_group.to_json('./tmp/df_group.json', orient='table')
+
+    _plot_burnup(df_group)
 
     _print_stats(df_points)
     
@@ -239,18 +246,26 @@ def _drop_non_working_days(df_group):
     return df_group
 
 def _plot_burnup(df):
-    fig, ax = plt.subplots(figsize=[9, 7])
-    ax.plot(df.loc[:, ['expected', 'final']], drawstyle='steps-mid')
-    plt.xticks(rotation=25)
+    today = datetime.now().strftime("%Y-%m-%d")
+    fname = 'tmp/{}-Burnup.pdf'.format(today)
 
-    x = df.index
-    y = np.linspace(0, df['expected'].max(), df.count()[0])
-    ax.plot(x, y, dashes=[10, 5, 10, 5])
+    with PdfPages(fname) as pdf:
+        fig, ax = plt.subplots(figsize=[9, 7])
 
-    ax.legend(['expected', 'accomplished', 'ideal'])
-    plt.title('burnup sprint 45/46')
-    plt.xticks(df.index)
-    plt.show()
+        ax.plot(df.loc[:, ['expected', 'final']], drawstyle='steps-mid')
+        plt.xticks(rotation=25)
+
+        x = df.index
+        y = np.linspace(0, df['expected'].max(), df.count()[0])
+        ax.plot(x, y, dashes=[10, 5, 10, 5])
+
+        ax.legend(['expected', 'accomplished', 'ideal'])
+        plt.title('burnup sprint 45/46')
+        plt.xticks(df.index)
+        
+        pdf.savefig(fig)
+        plt.close(fig)
+
 
 def _print_stats(df):
     """
