@@ -43,6 +43,7 @@ def burnup_service(sprint_dt_start, trello_board):
     # Join the dataframe df with the lists dataframe by idList column, 
     # into the df variable.
     df_lists = _get_list_df()
+    df = df_lists.join(df.set_index('idList'), on='idList', rsuffix='_2')
 
     # Normalize the date columns into day columns
     df['create_day'] = pd.to_datetime(df['create_date']).dt.normalize()
@@ -65,14 +66,14 @@ def burnup_service(sprint_dt_start, trello_board):
     # Dump df_points to json
     df_points.reset_index(drop=True).to_json('./df_plot.json', orient='table')
 
-    df_group = _aggregate_points(df_points)
+    df_group = _aggregate_points(sprint_dt_start, df_points)
 
     df_group = _drop_non_working_days(df_group)
     df_group.index = df_group.index.strftime('%d-%m')
     # Dump df_group to json
     df_group.to_json('./df_group.json', orient='table')
 
-    _print_stats()
+    _print_stats(df_points)
     
 
 def _get_list_df():
@@ -197,7 +198,7 @@ def _calc_points(df):
 
     return df_points
 
-def _aggregate_points(df_points):
+def _aggregate_points(sprint_dt_start, df_points):
     """
     A new dataframe called df_group is created after the df_points with the sum of
     final values and grouped by day.
@@ -263,6 +264,6 @@ def _print_stats(df):
     print('Waiting tasks: {}'.format(df_not_done.count().max()))
     print('Waiting points (expected): {}'.format(df_not_done['expected'].sum()))
 
-    print('Done tasks: {}'.format(df.count().max()))
-    print('Done points (expected): {}'.format(df['expected'].sum()))
-    print('Done points (informed): {}'.format(df['final'].sum()))
+    print('Done tasks: {}'.format(df_done.count().max()))
+    print('Done points (expected): {}'.format(df_done['expected'].sum()))
+    print('Done points (informed): {}'.format(df_done['final'].sum()))
