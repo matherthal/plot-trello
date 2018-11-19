@@ -42,7 +42,26 @@ def get_cards(sprint_start, trello_board):
         else:
             raise Exception("Error in trello get cards. StatusCode: {}.\
                 Message: {}".format(r.status_code, r.content))
-        
+    
+    # Also for each card we request the action 'createCard' which contains the 
+    # card creation date. If it is unknown or the date is before the 
+    # sprint_start then we use the sprint_start.
+    url_card_createdat = 'https://api.trello.com/1/cards/{}/actions?\
+        filter=createCard&key={}&token={}'
+
+    for c in cards:
+        url_card_info = url_card_createdat.format(c['id'], 
+            Config.TRELLO_KEY, Config.TRELLO_TOKEN)
+
+        r = requests.get(url_card_info)
+        if r.status_code == 200:
+            card_info = r.json()
+            if card_info is None or len(card_info) < 1:
+                c['create_date'] = sprint_start
+            else:
+                dt = card_info[0]['date']
+                c['create_date'] = sprint_start if dt < sprint_start else dt
+
     return cards
 
 def get_lists(board):
